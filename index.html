@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+	<title>Our Model Took 10 ms. Redis Took 200.</title>
+	<style>
+		.todo {
+			border: 2px dashed #ff79c6;
+			color: #ff79c6;
+			padding: 20px;
+			margin: 20px auto;
+			font-size: 0.6em;
+			text-align: left;
+		}
+
+		.roadmap {
+			background: #ffb86c;
+			color: #282a36;
+			font-size: 0.55em;
+			font-weight: bold;
+			padding: 2px 10px;
+			border-radius: 6px;
+			vertical-align: middle;
+			margin-right: 10px;
+		}
+
+		.cols {
+			display: flex;
+			gap: 40px;
+			justify-content: center;
+			align-items: flex-start;
+		}
+
+		.cols>div {
+			flex: 1;
+		}
+
+		.big {
+			font-size: 2.2em;
+			font-weight: bold;
+			color: #ff79c6;
+			margin: 0;
+		}
+
+		.reveal table.bench td,
+		.reveal table.bench th {
+			font-size: 0.75em;
+			padding: 6px 18px;
+			white-space: nowrap;
+		}
+
+		.reveal table.bench td.num,
+		.reveal table.bench th.num {
+			text-align: right;
+		}
+
+		.reveal table.bench tr.hot td {
+			color: #ff79c6;
+			font-weight: bold;
+		}
+
+		.reveal table.bench tr.murr td {
+			color: #50fa7b;
+			font-weight: bold;
+		}
+
+		.reveal ul.compact {
+			font-size: 0.85em;
+		}
+
+		.links p {
+			font-size: 0.75em;
+		}
+
+		.reveal pre.quickstart {
+			width: 95%;
+			margin: 0 auto;
+			font-size: 0.6em;
+			line-height: 1.4;
+		}
+
+		.reveal pre.quickstart code {
+			max-height: none;
+		}
+	</style>
+</head>
+
+<body>
+	<div class="reveal">
+		<div class="slides">
+			<section>
+				<h1 style="font-size: 2.6em; margin-bottom: 0;">Feature serving</h1>
+				<img src="img/intro.png" style="margin: 0px;" height="400px">
+				<h1 style="font-size: 2.6em;">beyond RAM</h1>
+				<p><small>Roman Grebennikov | Feature Store Summit 2026</small></p>
+			</section>
+
+			<section>
+				<h2>TLDR of typical ranker design</h2>
+				<p><img src="img/metarank.png" height="480px" style="margin: 0;"></p>
+				<p style="font-size: 0.8em;">features built offline in batch, served online from Redis</p>
+			</section>
+
+			<section>
+				<h2>Candidates vs latency</h2>
+				<p><img src="img/latency.png" height="440px" style="margin: 0;"></p>
+				<p>Bigger depth = better relevance = worse latency</p>
+			</section>
+			<section>
+				<h2>Candidates vs $$$</h2>
+				<p><img src="img/deeper.png" height="440px" style="margin: 0;"></p>
+				<p>Bigger depth = more $$$</p>
+			</section>
+			<section>
+				<h2>Latency vs $$$</h2>
+				<p><img src="img/ctr_lat.png" height="440px" style="margin: 0;"></p>
+				<p>Worse latency = less $$$</p>
+			</section>
+			<section>
+				<h2>Latency vs costs</h2>
+				<p>True story: +50 new features</p>
+				<ul>
+					<li class="fragment"><strong>CTR</strong>: to sky!</li>
+					<li class="fragment"><strong>AWS bill</strong>: to the sky!</li>
+				</ul>
+				<p class="fragment">TLDR: infra started to eat margins</p>
+			</section>
+
+			<section>
+				<h2>Redis: cold but billed as hot</h2>
+				<table class="bench">
+					<thead>
+						<tr>
+							<th>feature group</th>
+							<th class="num">stored rows</th>
+							<th class="num">read per day</th>
+							<th class="num">hit rate</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>document</td>
+							<td class="num">0.1%</td>
+							<td class="num">94%</td>
+							<td class="num">58%</td>
+						</tr>
+						<tr>
+							<td>query</td>
+							<td class="num">0.3%</td>
+							<td class="num">29%</td>
+							<td class="num">40%</td>
+						</tr>
+						<tr>
+							<td>user</td>
+							<td class="num">8.4%</td>
+							<td class="num">7.5%</td>
+							<td class="num">86%</td>
+						</tr>
+						<tr>
+							<td>document × category</td>
+							<td class="num">6.0%</td>
+							<td class="num">49%</td>
+							<td class="num">96%</td>
+						</tr>
+						<tr class="hot">
+							<td>document × query</td>
+							<td class="num">18.4%</td>
+							<td class="num">32%</td>
+							<td class="num">11%</td>
+						</tr>
+						<tr class="hot">
+							<td>user × category</td>
+							<td class="num">31.4%</td>
+							<td class="num">1.1%</td>
+							<td class="num">37%</td>
+						</tr>
+						<tr class="hot">
+							<td>user × document</td>
+							<td class="num">35.4%</td>
+							<td class="num">4.9%</td>
+							<td class="num">1.3%</td>
+						</tr>
+					</tbody>
+				</table>
+				<p>85% of features are cold!</p>
+			</section>
+			<section>
+				<img src="img/pokemon.png" height="600px">
+			</section>
+			<section>
+				<h2><img src="img/logo.png" height="70px" style="margin: 0 15px 0 0; vertical-align: middle;">murrdb:
+					Redis for ML inference workloads</h2>
+				<p>
+					<img src="img/murr-overview2.png">
+				</p>
+			</section>
+			<section>
+				<h2><img src="img/logo.png" height="70px" style="margin: 0 15px 0 0; vertical-align: middle;">murrdb:
+					Redis for Batch Reads</h2>
+				<p>Parquet+Arrow for IO: zero-copy into pandas/torch</p>
+				<table class="bench">
+					<thead>
+						<tr>
+							<th>engine</th>
+							<th>layout</th>
+							<th class="num">RAM</th>
+							<th class="num">p50, Rust</th>
+							<th class="num">p50, Python e2e</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr class="murr">
+							<td>murr 0.2 mmap</td>
+							<td>native</td>
+							<td class="num">7.5 GiB</td>
+							<td class="num">0.27 ms</td>
+							<td class="num">1.08 ms</td>
+						</tr>
+						<tr>
+							<td>Dragonfly 1.31</td>
+							<td>HSET</td>
+							<td class="num">20.1 GiB</td>
+							<td class="num">2.82 ms</td>
+							<td class="num">8.25 ms</td>
+						</tr>
+						<tr>
+							<td>Valkey 8.1</td>
+							<td>HSET</td>
+							<td class="num">19.4 GiB</td>
+							<td class="num">3.20 ms</td>
+							<td class="num">8.63 ms</td>
+						</tr>
+						<tr>
+							<td>Redis 8.6</td>
+							<td>HSET</td>
+							<td class="num">20.1 GiB</td>
+							<td class="num">3.25 ms</td>
+							<td class="num">8.50 ms</td>
+						</tr>
+						<tr>
+							<td>PostgreSQL 18</td>
+							<td>col-per-feature</td>
+							<td class="num">23.4 GiB</td>
+							<td class="num">6.54 ms</td>
+							<td class="num">13.8 ms</td>
+						</tr>
+					</tbody>
+				</table>
+				<p><small>100M rows × 10 float32, 1000 keys per read &middot;
+						github.com/murrdb/murr-benchmark</small>
+				</p>
+			</section>
+
+			<section>
+				<h2>Hot in RAM. Warm on NVMe.</h2>
+				<br>
+				<p style="font-size: 0.7em; margin: 4px 0;">disk mode, RAM capped at 2 GiB, 100M rows</p>
+				<table class="bench">
+					<thead>
+						<tr>
+							<th>engine</th>
+							<th>layout</th>
+							<th class="num">RAM</th>
+							<th class="num">disk</th>
+							<th class="num">Rust p50</th>
+							<th class="num">Python p50</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr class="murr">
+							<td>murr 0.2 block</td>
+							<td>native</td>
+							<td class="num">1.7 GiB</td>
+							<td class="num">5.8 GiB</td>
+							<td class="num">6.33 ms</td>
+							<td class="num">6.69 ms</td>
+						</tr>
+						<tr>
+							<td>PostgreSQL 18</td>
+							<td>blob</td>
+							<td class="num">2.0 GiB</td>
+							<td class="num">12.8 GiB</td>
+							<td class="num">189 ms</td>
+							<td class="num">171 ms</td>
+						</tr>
+						<tr>
+							<td>PostgreSQL 18</td>
+							<td>col-per-feature</td>
+							<td class="num">2.0 GiB</td>
+							<td class="num">12.7 GiB</td>
+							<td class="num">217 ms</td>
+							<td class="num">153 ms</td>
+						</tr>
+					</tbody>
+				</table>
+				<br>
+				<ul class="compact">
+					<li><span class="roadmap">ROADMAP</span><strong>SlateDB backend:</strong> nodes hold no state
+					</li>
+					<li><span class="roadmap">ROADMAP</span><strong>sparse columns:</strong> empty cell = 0 bytes
+					</li>
+				</ul>
+			</section>
+
+			<section>
+				<h2 style="margin-bottom: 10px;">pip install murrdb</h2>
+				<pre class="quickstart"><code data-trim data-noescape class="language-python">
+# embedded, no server
+db = Murr.start_local(cache_dir="/tmp/murr")                
+
+# read it back
+res = db.read("docs", keys=["doc_1", "doc_3"], columns=["score"])  
+
+# look mom zero copy!			  
+print(res.to_pandas())            
+				</code></pre>
+			</section>
+			<section>
+				<h2>is it on prod? NO!</h2>
+				<ul>
+					<li><strong>github</strong>: github.com/murrdb/murr</li>
+					<li><strong>bindings</strong>: Python/Java/Rust</li>
+					<li><strong>benchmark</strong>: github.com/murrdb/murr-benchmark</li>
+					<li><strong>linkedin:</strong></li>
+				</ul>
+				<p><img src="img/qr.png" height="300px"></p>
+			</section>
+		</div>
+	</div>
+
+	<script type="module">
+		import Reveal from 'reveal.js';
+		import RevealNotes from 'reveal.js/plugin/notes';
+		import RevealMarkdown from 'reveal.js/plugin/markdown';
+		import RevealHighlight from 'reveal.js/plugin/highlight';
+
+		import 'reveal.js/reset.css';
+		import 'reveal.js/reveal.css';
+		import 'reveal.js/theme/dracula.css';
+
+		// Theme used for syntax highlighted code
+		import 'reveal.js/plugin/highlight/monokai.css';
+
+		// More info about initialization & config:
+		// - https://revealjs.com/initialization/
+		// - https://revealjs.com/config/
+		Reveal.initialize({
+			hash: true,
+			controls: true,
+			progress: true,
+			width: 1200,
+			transition: 'none',
+			slideNumber: true,
+
+			// Learn about plugins: https://revealjs.com/plugins/
+			plugins: [RevealMarkdown, RevealHighlight, RevealNotes],
+		});
+	</script>
+</body>
+
+</html>
