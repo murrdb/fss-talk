@@ -5,7 +5,7 @@
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-	<title>Our Model Took 10 ms. Redis Took 200.</title>
+	<title>Feature serving beyond RAM</title>
 	<style>
 		.todo {
 			border: 2px dashed #ff79c6;
@@ -97,7 +97,16 @@
 				<h1 style="font-size: 2.6em;">beyond RAM</h1>
 				<p><small>Roman Grebennikov | Feature Store Summit 2026</small></p>
 			</section>
-
+			<section>
+				<h2>whoami</h2>
+				<img src="img/ava.png" height="300px">
+				<ul>
+					<li>PhD in CS, quant trading, credit scoring</li>
+					<li><strong>Findify</strong>: e-commerce search, personalization</li>
+					<li><strong>Delivery Hero</strong>: food search, LLMs</li>
+					<li><strong>Opensource</strong>: Metarank, Nixiesearch, flink-scala-api</li>
+				</ul>
+			</section>
 			<section>
 				<h2>TLDR of typical ranker design</h2>
 				<p><img src="img/metarank.png" height="480px" style="margin: 0;"></p>
@@ -192,10 +201,14 @@
 			</section>
 			<section>
 				<h2><img src="img/logo.png" height="70px" style="margin: 0 15px 0 0; vertical-align: middle;">murrdb:
-					Redis for ML inference workloads</h2>
+					Redis for ML inference</h2>
 				<p>
 					<img src="img/murr-overview2.png">
 				</p>
+			</section>
+			<section>
+				<h2>murrdb: not a feature store!</h2>
+				<img src="img/place.png">
 			</section>
 			<section>
 				<h2><img src="img/logo.png" height="70px" style="margin: 0 15px 0 0; vertical-align: middle;">murrdb:
@@ -304,18 +317,85 @@
 					</li>
 				</ul>
 			</section>
+			<section>
+				<h2>Real data</h2>
+				<p>user × doc: 71M rows, 8 features, batch=150, 1.5% hit rate</p>
+				<table class="bench">
+					<thead>
+						<tr>
+							<th>engine</th>
+							<th>layout</th>
+							<th class="num">RAM</th>
+							<th class="num">p50, Rust</th>
+							<th class="num">net TX / read</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr class="murr">
+							<td>murr 0.3 mmap</td>
+							<td>native</td>
+							<td class="num">6.1 GiB</td>
+							<td class="num">0.14 ms</td>
+							<td class="num">2.0 KiB</td>
+						</tr>
+						<tr>
+							<td>Dragonfly 2.0</td>
+							<td>HSET</td>
+							<td class="num">12.8 GiB</td>
+							<td class="num">0.14 ms</td>
+							<td class="num">1.2 KiB</td>
+						</tr>
+						<tr>
+							<td>Valkey 9.1</td>
+							<td>HSET</td>
+							<td class="num">11.4 GiB</td>
+							<td class="num">0.11 ms</td>
+							<td class="num">1.2 KiB</td>
+						</tr>
+						<tr>
+							<td>Redis 8.10</td>
+							<td>HSET</td>
+							<td class="num">12.1 GiB</td>
+							<td class="num">0.17 ms</td>
+							<td class="num">1.2 KiB</td>
+						</tr>
+						<tr>
+							<td>PostgreSQL 18</td>
+							<td>col-per-feature</td>
+							<td class="num">25.3 GiB</td>
+							<td class="num">0.24 ms</td>
+							<td class="num">0.4 KiB</td>
+						</tr>
+					</tbody>
+				</table>
+				<p>TLDR: 2x less RAM, ~same latency</p>
+			</section>
+			<section>
+				<h2>sneak peek: S3 offload</h2>
+				<img src="img/s3-sync.png">
+				<ul>
+					<li><strong>v0.3</strong>: RocksDB, NVMe offload</li>
+					<li><strong>v0.4</strong>: RocksDB+SlateDB: S3 offload</li>
+				</ul>
+				<p><strong>MultiGet PR</strong>: github.com/slatedb/slatedb/pull/1810</p>
+			</section>
 
 			<section>
-				<h2 style="margin-bottom: 10px;">pip install murrdb</h2>
-				<pre class="quickstart"><code data-trim data-noescape class="language-python">
-# embedded, no server
-db = Murr.start_local(cache_dir="/tmp/murr")                
+				<h2 style="margin-bottom: 10px;">pip install murr</h2>
+				<pre class="quickstart"><code data-noescape class="language-python">
+	# ! docker start murrdb/murrdb:0.3.1
 
-# read it back
-res = db.read("docs", keys=["doc_1", "doc_3"], columns=["score"])  
+	# connect
+	async with Client("http://localhost:8080") as db:
+		# read
+		res = await db.read(
+			table="docs", 
+			keys={"id": ["doc_1", "doc_3"]}, 
+			columns=["score"])
+			
+		# look mom, zero copy!
+		print(res.to_pandas())  
 
-# look mom zero copy!			  
-print(res.to_pandas())            
 				</code></pre>
 			</section>
 			<section>
